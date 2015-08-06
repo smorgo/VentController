@@ -325,17 +325,6 @@ int postSensorReadings()
   
   String msg = "R(" + String(rand) + "),TA(" + String(temperatureA,2) + "),TB(" + String(temperatureB,2) + "),HU(" + String(humidity,2) + "),LX(" + String(event.light,2) + "),PA(" + String(pressure,0) + ")";
 
-/*
-  int msgLength = msg.length();
-  int bufferLength = apiKeyLength + msgLength + 1;
-  char *buffer = (char *)malloc(bufferLength);
-  memcpy(buffer, apiKey, apiKeyLength);
-  msg.toCharArray(buffer + apiKeyLength, msgLength + 1);
-  
-  unsigned char* hash=MD5::make_hash(buffer);
-  char *md5str = MD5::make_digest(hash, 16);
-*/
-
   String calcHash = getHash(msg);
   
   msg += ":";
