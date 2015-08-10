@@ -7,6 +7,7 @@
  * #define __KEYS_H__
  * #define WIFI_SSID "<Your WiFi SSID>"
  * #define WIFI_PWD "<Your WiFi Passkey>"
+ * #define ANNOUNCE_TOPIC "/announce"
  * #define SENSORS_TOPIC "/sensors"
  * #define SENSORS_CMD_TOPIC "/senscmd"
  * #define SERVER "<Your MQTT broker URL or IP address>"
@@ -29,23 +30,23 @@
 #include <PubSubClient.h>
 
 // Define supported sensors
-#define TSL2561
-#define HTU21DF
-#define T5403
+#define INCLUDE_TSL2561
+#define INCLUDE_HTU21DF
+#define INCLUDE_T5403
 
-#ifdef TSL2561
+#ifdef INCLUDE_TSL2561
 #pragma message("Including support for TSL2561 Luminosity sensor")
 #include <Adafruit_Sensor.h>
 #include <Adafruit_TSL2561_U.h>
 Adafruit_TSL2561_Unified tsl = Adafruit_TSL2561_Unified(TSL2561_ADDR_FLOAT, 12345);
 #endif
 
-#ifdef HTU21DF
+#ifdef INCLUDE_HTU21DF
 #pragma message("Including support for HTU21DF Humidity sensor")
 #include <Adafruit_HTU21DF.h>
 #endif
 
-#ifdef T5403
+#ifdef INCLUDE_T5403
 #pragma message("Including support for T5403 Barometric Pressure sensor")
 #include <SparkFunT5403.h>
 #endif
@@ -53,11 +54,11 @@ Adafruit_TSL2561_Unified tsl = Adafruit_TSL2561_Unified(TSL2561_ADDR_FLOAT, 1234
 #include <ESP8266WiFi.h>
 #include <Wire.h>
 
-#ifdef HTU21DF
+#ifdef INCLUDE_HTU21DF
 Adafruit_HTU21DF htu21df = Adafruit_HTU21DF();
 #endif
 
-#ifdef T5403
+#ifdef INCLUDE_T5403
 SparkFun_T5403 t5403 = SparkFun_T5403();
 #endif
 
@@ -246,16 +247,16 @@ void initHardware()
   pinMode(LED_PIN, OUTPUT);
   digitalWrite(LED_PIN, LOW);
 
-#ifdef TSL2561
+#ifdef INCLUDE_TSL2561
   tsl.begin();
   configureTSL2561();
 #endif
 
-#ifdef HTU21DF
+#ifdef INCLUDE_HTU21DF
   htu21df.begin();
 #endif
 
-#ifdef T5403
+#ifdef INCLUDE_T5403
   t5403.begin();
 #endif
 
@@ -273,6 +274,7 @@ bool connectBroker()
     Serial.print("Subscribing to ");
     Serial.println(cmd_topic);
     client.subscribe(cmd_topic);
+    client.publish(ANNOUNCE_TOPIC,clientName);
     return true;
   }    
   else 
@@ -296,19 +298,19 @@ int postSensorReadings()
     connectWiFi();
   }
 
-#ifdef HTU21DF
+#ifdef INCLUDE_HTU21DF
   htu21df.reset();
   temperatureA = htu21df.readTemperature();
   humidity = htu21df.readHumidity();
 #endif
 
-#ifdef TSL2561
+#ifdef INCLUDE_TSL2561
   sensors_event_t event;
   tsl.getEvent(&event);
   luminosity = event.light;
 #endif
 
-#ifdef T5403
+#ifdef INCLUDE_T5403
   temperatureB = float(t5403.getTemperature(temperature_units::CELSIUS))/100.0;
   pressure = t5403.getPressure(MODE_ULTRA);
 #endif
@@ -323,7 +325,7 @@ int postSensorReadings()
   
   long rand = random(2147483647);
   
-  String msg = "R(" + String(rand) + "),TA(" + String(temperatureA,2) + "),TB(" + String(temperatureB,2) + "),HU(" + String(humidity,2) + "),LX(" + String(event.light,2) + "),PA(" + String(pressure,0) + ")";
+  String msg = "R(" + String(rand) + "),TA(" + String(temperatureA,2) + "),TB(" + String(temperatureB,2) + "),HU(" + String(humidity,2) + "),LX(" + String(luminosity,2) + "),PA(" + String(pressure,0) + ")";
 
   String calcHash = getHash(msg);
   
@@ -356,6 +358,7 @@ int postSensorReadings()
   return 1; // Return success
 }
 
+#ifdef INCLUDE_TSL2561
 void configureTSL2561(void)
 {
   /* You can also manually set the gain or enable auto-gain support */
@@ -374,4 +377,5 @@ void configureTSL2561(void)
   Serial.print  ("Timing:       "); Serial.println("402 ms");
   Serial.println("------------------------------------");
 }
+#endif
 
