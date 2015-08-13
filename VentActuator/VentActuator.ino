@@ -57,6 +57,8 @@ bool seeded = false;
 /////////////////////
 const int LED_PIN = 5; // Thing's onboard, green LED
 const int BUTTON_PIN = A0; 
+const int MOTOR_OPEN_PIN = 12;
+const int MOTOR_CLOSE_PIN = 13;
 
 /////////////////
 // Post Timing //
@@ -68,11 +70,25 @@ unsigned long counter = 0;
 /////////////////
 // State       //
 /////////////////
-int currentPosition = -1;
-int targetPosition = 0;
-int buttonState = -1;
-int rainState = -1;
- 
+const int VENT_CLOSED = 0;
+const int VENT_OPEN = 4;
+const int NONE = -1;
+const int fullTransitTime = 8000; // 8 seconds
+const int stepTransitTime = fullTransitTime / VENT_OPEN;
+
+int currentPosition = VENT_OPEN; // On boot, we'll assume it's open and close it.
+int targetPosition = NONE;
+int buttonState = NONE;
+int rainState = NONE;
+
+unsigned long startMillis = 0; // When the current movement started
+unsigned long endMillis = 0; // When the current movement should end
+
+bool isMoving = false;
+bool directionOpen = false;
+bool currentOpenRelayState = HIGH;
+bool currentCloseRelayState = HIGH;
+
 String getHash(String payload)
 {
   int payloadLength = payload.length();
@@ -91,6 +107,24 @@ String getHash(String payload)
   return calcHash;
 }
 
+void processPositionMessage(String msg)
+{
+  if(msg.startsWith("POS("))
+  {
+    int ix = msg.indexOf(")");
+    if(ix < 5)
+    {
+      return;
+    }
+    String data = msg.substring(4,ix);
+    Serial.print("Position requested: ");
+    Serial.println(data);
+
+    int pos = data.toInt();
+    setPosition(pos);
+  }
+}
+
 void processMessage(String recv_topic, String msg)
 {
   Serial.print(recv_topic);
@@ -102,6 +136,10 @@ void processMessage(String recv_topic, String msg)
     Serial.println("Restarting...");
     delay(1000);
     ESP.restart();
+  }
+  else
+  {
+    processPositionMessage(msg);
   }
 }
 
@@ -201,7 +239,11 @@ void initHardware()
   Serial.begin(9600);
   Serial.println("");
   pinMode(LED_PIN, OUTPUT);
+  pinMode(MOTOR_OPEN_PIN, OUTPUT);
+  pinMode(MOTOR_CLOSE_PIN, OUTPUT);
   digitalWrite(LED_PIN, LOW);
+  digitalWrite(MOTOR_OPEN_PIN, HIGH);
+  digitalWrite(MOTOR_CLOSE_PIN, HIGH);
   Serial.println("");
 }
 
@@ -273,6 +315,88 @@ void callback(const MQTT::Publish& pub)
   }
 }
 
+void setOpenRelay(bool state)
+{
+  if(state != currentOpenRelayState)
+  {
+    Serial.print("Open relay = ");
+    Serial.println(state ? "OFF" : "ON");
+    digitalWrite(MOTOR_OPEN_PIN, state);
+    currentOpenRelayState = state;  
+  }
+}
+
+void setCloseRelay(bool state)
+{
+  if(state != currentCloseRelayState)
+  {
+    Serial.print("Close relay = ");
+    Serial.println(state ? "OFF" : "ON");
+    digitalWrite(MOTOR_CLOSE_PIN, state);
+    currentCloseRelayState = state;  
+  }
+}
+
+void setRelays()
+{
+  if(!isMoving)
+  {
+    // Nothing to do
+    return;
+  }
+  
+  if(millis() > endMillis)
+  {
+    Serial.println("Stopping");
+    // Time to stop
+    setOpenRelay(HIGH);
+    setCloseRelay(HIGH);
+    isMoving = false;
+    directionOpen = false;
+    startMillis = 0;
+    endMillis = 0;
+    currentPosition = targetPosition;
+  }
+  else
+  {
+    setOpenRelay(directionOpen ? LOW : HIGH);
+    setCloseRelay(directionOpen ? HIGH : LOW);
+  }
+}
+
+void setPosition(int position)
+{
+  if(isMoving)
+  {
+    return;  
+  }
+  
+  Serial.print("Selecting position ");
+  Serial.println(String(position));
+  
+  targetPosition = position;
+
+  int steps = abs(targetPosition - currentPosition);
+
+  if(steps == 0)
+  {
+    // Nowhere to go
+    return;
+  }
+
+  startMillis = millis();
+  endMillis = startMillis + steps * stepTransitTime;
+  directionOpen = (targetPosition > currentPosition);
+  isMoving = true;
+
+  Serial.print("Timers: startMillis = ");
+  Serial.print(String(startMillis));
+  Serial.print(" endMillis = ");
+  Serial.println(String(endMillis));
+  
+  setRelays();
+}
+
 void setup() 
 {
   initHardware();
@@ -280,11 +404,14 @@ void setup()
   client.set_callback(callback);
   
   connectWiFi();
+
+  setPosition(VENT_CLOSED);
   digitalWrite(LED_PIN, HIGH);
 }
 
 void loop() 
 {
+  setRelays();
   client.loop();
   if (lastPost + postRate <= millis())
   {
