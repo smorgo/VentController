@@ -29,6 +29,21 @@
 #include <MQTT.h>
 #include <PubSubClient.h>
 
+// MQTT Topics
+const char TOPIC_CMD[] ="/cmd";
+const char TOPIC_STATUS[] = "/status";
+const char TOPIC_EVENT[] = "/event";
+
+// Message Types
+#define MSG_TYPE_SURVEY (1)
+#define MSG_TYPE_HELLO (2)
+#define MSG_TYPE_SENSOR (3)
+#define MSG_TYPE_ACTUATOR (4)
+#define MSG_TYPE_ACTSTAT (5)
+#define MSG_TYPE_RESET (6)
+#define MSG_TYPE_OVERRIDE (7)
+#define MSG_TYPE_BUTTON (8)
+
 // Define supported sensors
 #define INCLUDE_TSL2561
 #define INCLUDE_HTU21DF
@@ -73,12 +88,11 @@ float pressure;
 //////////////////////
 const char ssid[] = WIFI_SSID;
 const char password[] = WIFI_PWD;
-const char topic[] = SENSORS_TOPIC;
-const char cmd_topic[] = SENSORS_CMD_TOPIC;
 const char server[] = SERVER;
 const char clientName[] = SENSORS_CLIENT_NAME;
 const char apiKey[] = API_KEY;
 const int apiKeyLength = API_KEY_LENGTH;
+String privateCmdTopic;
 
 #pragma message("ssid: " WIFI_SSID)
 #pragma message("server: " SERVER)
@@ -103,6 +117,30 @@ const int I2C_SCL = 14;
 const unsigned long postRate = 15000;
 unsigned long lastPost = 0;
 unsigned long counter = 0;
+
+String getParam(String msg, String name)
+{
+  String tmpMsg = "," + msg;
+  String lookFor = "," + name + "(";
+
+  int startIx = tmpMsg.indexOf(lookFor);
+  if(startIx < 0)
+  {
+    return "";
+  }
+  int endIx = tmpMsg.indexOf(")", startIx);
+  if(endIx < startIx)
+  {
+    return "";
+  }
+  String val =  msg.substring(startIx + lookFor.length()-1, endIx-1);
+  Serial.print("Looked for ");
+  Serial.print(lookFor);
+  Serial.print(" found ");
+  Serial.println(val);
+
+  return val;
+}
 
 void callback(const MQTT::Publish& pub) 
 {
@@ -166,22 +204,44 @@ String getHash(String payload)
   return calcHash;
 }
 
+bool isMyTopic(String topic)
+{
+  return (topic == TOPIC_CMD) ||
+         (topic == privateCmdTopic);
+}
+
 void processMessage(String recv_topic, String msg)
 {
   Serial.print(recv_topic);
   Serial.print(" => ");
   Serial.println(msg);
 
-  if(msg == "RESTART")
+  if(!isMyTopic(recv_topic))
   {
-    Serial.println("Restarting...");
-    delay(1000);
-    ESP.restart();
+    return;
   }
   
+  int msgType = getParam(msg,"M").toInt();
+
+  switch(msgType)
+  {
+    case MSG_TYPE_SURVEY:
+      publish(TOPIC_STATUS,getHelloMessage());
+      break;
+    case MSG_TYPE_RESET:
+      Serial.println("Restarting...");
+      delay(1000);
+      ESP.restart();
+      break;
+    default:
+      Serial.println("Unrecognised message");
+  }
 }
+
 void setup() 
 {
+  privateCmdTopic = String(TOPIC_CMD) + "/" + String(SENSORS_CLIENT_NAME);
+  
   initHardware();
 
   client.set_callback(callback);
@@ -204,6 +264,87 @@ void loop()
       delay(100);    
     }
   }
+}
+
+void subscribe(String topic)
+{
+  Serial.print("Subscribing to MQTT topic: ");
+  Serial.println(topic);
+  client.subscribe(topic);
+}
+
+void publishToConnection(String topic, String msg)
+{
+  String calcHash = getHash(msg);
+  
+  msg += ":";
+  msg += calcHash;
+
+  Serial.print("[");
+  Serial.print(++counter);
+  Serial.print("] ");
+  Serial.print("Publish to ");
+  Serial.print(topic);
+  Serial.print(" = ");
+  Serial.println(msg);
+  
+  if(!client.publish(topic, msg))
+  {
+    Serial.println("Publish FAILED");
+  } 
+}
+
+void publish(String topic, String msg)
+{
+  bool connected = client.connected();
+
+  if(!connected) 
+  {
+    connected = connectBroker();
+  }
+  
+  if(connected)
+  {
+    publishToConnection(topic, msg);
+  }
+}
+
+String getBaseMessage(int messageType)
+{
+  // Add a random value to our message, so that the MD5 hash will be different,
+  // even when all of the sensor readings are the same.
+  if(!seeded)
+  {
+    randomSeed(millis());
+    seeded = true;
+  }
+  
+  long rand = random(2147483647);
+  
+  String msg = "R(" + String(rand) + "),M(" + String(messageType) + "),DEV(" + clientName + ")";
+
+  return msg;
+}
+
+String getHelloMessage()
+{
+  String msg = getBaseMessage(MSG_TYPE_HELLO);
+
+  // Add Topics
+  msg += ",PUB(" + String(TOPIC_STATUS) + ")" +
+         ",SUB(" + String(TOPIC_CMD) + ")" +
+         ",SUB(" + privateCmdTopic + ")";
+
+  return msg;
+}
+
+String getSensorMessage()
+{
+  String msg = getBaseMessage(MSG_TYPE_SENSOR);
+
+  String msg2 = ",TA(" + String(temperatureA,2) + "),TB(" + String(temperatureB,2) + "),HU(" + String(humidity,2) + "),LX(" + String(luminosity,2) + "),PA(" + String(pressure,0) + ")";
+
+  return msg + msg2;
 }
 
 void connectWiFi()
@@ -269,12 +410,9 @@ bool connectBroker()
   if (client.connect(clientName)) 
   {
     Serial.println("Connected to MQTT broker");
-    Serial.print("Topic is: ");
-    Serial.println(topic);
-    Serial.print("Subscribing to ");
-    Serial.println(cmd_topic);
-    client.subscribe(cmd_topic);
-    client.publish(ANNOUNCE_TOPIC,clientName);
+    subscribe(TOPIC_CMD);
+    subscribe(privateCmdTopic);
+    publishToConnection(TOPIC_STATUS,getHelloMessage());
     return true;
   }    
   else 
@@ -315,41 +453,7 @@ int postSensorReadings()
   pressure = t5403.getPressure(MODE_ULTRA);
 #endif
 
-  // Add a random value to our message, so that the MD5 hash will be different,
-  // even when all of the sensor readings are the same.
-  if(!seeded)
-  {
-    randomSeed(long(pressure + humidity + (temperatureA * 100) + (temperatureB * 100)));
-    seeded = true;
-  }
-  
-  long rand = random(2147483647);
-  
-  String msg = "R(" + String(rand) + "),TA(" + String(temperatureA,2) + "),TB(" + String(temperatureB,2) + "),HU(" + String(humidity,2) + "),LX(" + String(luminosity,2) + "),PA(" + String(pressure,0) + ")";
-
-  String calcHash = getHash(msg);
-  
-  msg += ":";
-  msg += calcHash;
-
-  Serial.print(++counter);
-  Serial.print(" = ");
-  Serial.println(msg);
-
-  bool connected = client.connected();
-
-  if(!connected) 
-  {
-    connected = connectBroker();
-  }
-  
-  if(connected)
-  {
-    if(!client.publish(topic, msg))
-    {
-      Serial.println("Publish FAILED");
-    } 
-  }
+  publish(TOPIC_STATUS,getSensorMessage());
 
   // Before we exit, turn the LED off.
   digitalWrite(LED_PIN, LOW);

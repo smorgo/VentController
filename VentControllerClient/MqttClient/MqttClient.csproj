@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectTypeGuids>{786C830F-07A1-408B-BD7F-6EE04809D6DB};{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}</ProjectTypeGuids>
+    <ProjectGuid>{26DA7DBF-31A2-447E-A8F3-EF68B6FC80F3}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <RootNamespace>MqttClient</RootNamespace>
+    <AssemblyName>MqttClient</AssemblyName>
+    <TargetFrameworkProfile>Profile78</TargetFrameworkProfile>
+    <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug</OutputPath>
+    <DefineConstants>DEBUG;</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <ConsolePause>false</ConsolePause>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>full</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release</OutputPath>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <ConsolePause>false</ConsolePause>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="CompleteArgs.cs" />
+    <Compile Include="IMqtt.cs" />
+    <Compile Include="IMqttConnectDisconnect.cs" />
+    <Compile Include="IMqttPublisher.cs" />
+    <Compile Include="IMqttShared.cs" />
+    <Compile Include="IMqttSharedSubscriber.cs" />
+    <Compile Include="IMqttSubscriber.cs" />
+    <Compile Include="IPersistence.cs" />
+    <Compile Include="Mqtt.cs" />
+    <Compile Include="MqttBroker.cs" />
+    <Compile Include="MqttBrokerUnavailableException.cs" />
+    <Compile Include="MqttClientFactory.cs" />
+    <Compile Include="MqttDelegates.cs" />
+    <Compile Include="MqttException.cs" />
+    <Compile Include="MqttNotConnectedException.cs" />
+    <Compile Include="MqttParcel.cs" />
+    <Compile Include="MqttPayload.cs" />
+    <Compile Include="PublishArrivedArgs.cs" />
+    <Compile Include="QoS.cs" />
+    <Compile Include="Core\MQTTStreamExceptions.cs" />
+    <Compile Include="Core\NotConnectedException.cs" />
+    <Compile Include="Core\QoSManager.cs" />
+    <Compile Include="Core\StreamFactory.cs" />
+    <Compile Include="Core\StreamManager.cs" />
+    <Compile Include="Core\Subscription.cs" />
+    <Compile Include="Core\Messages\IPersistentMessage.cs" />
+    <Compile Include="Core\Messages\MessageFactory.cs" />
+    <Compile Include="Core\Messages\MqttAcknowledgeMessage.cs" />
+    <Compile Include="Core\Messages\MqttConnackMessage.cs" />
+    <Compile Include="Core\Messages\MqttConnectMessage.cs" />
+    <Compile Include="Core\Messages\MqttDisconnectMessage.cs" />
+    <Compile Include="Core\Messages\MqttMessage.cs" />
+    <Compile Include="Core\Messages\MqttMessageReceivedEventArgs.cs" />
+    <Compile Include="Core\Messages\MqttPingReqMessage.cs" />
+    <Compile Include="Core\Messages\MqttPingRespMessage.cs" />
+    <Compile Include="Core\Messages\MqttPubackMessage.cs" />
+    <Compile Include="Core\Messages\MqttPubcompMessage.cs" />
+    <Compile Include="Core\Messages\MqttPublishMessage.cs" />
+    <Compile Include="Core\Messages\MqttPubrecMessage.cs" />
+    <Compile Include="Core\Messages\MqttPubrelMessage.cs" />
+    <Compile Include="Core\Messages\MqttSubackMessage.cs" />
+    <Compile Include="Core\Messages\MqttSubscribeMessage.cs" />
+    <Compile Include="Core\Messages\MqttUnsubackMessage.cs" />
+    <Compile Include="Core\Messages\MqttUnsubscribeMessage.cs" />
+    <Compile Include="Logger\FileLog.cs" />
+    <Compile Include="Logger\ILog.cs" />
+    <Compile Include="Logger\Log.cs" />
+    <Compile Include="MatchTree\Topic.cs" />
+    <Compile Include="MatchTree\TopicNode.cs" />
+    <Compile Include="MatchTree\TopicTree.cs" />
+    <Compile Include="HashTable.cs" />
+    <Compile Include="Timer.cs" />
+    <Compile Include="ITcpClient.cs" />
+    <Compile Include="StreamExtensions.cs" />
+    <Compile Include="Console.cs" />
+    <Compile Include="INetworkStream.cs" />
+  </ItemGroup>
+  <Import Project="$(MSBuildExtensionsPath32)\Microsoft\Portable\$(TargetFrameworkVersion)\Microsoft.Portable.CSharp.targets" />
+  <Import Project="..\packages\Xamarin.Forms.1.4.4.6392\build\portable-win+net45+wp80+win81+wpa81+MonoAndroid10+MonoTouch10+Xamarin.iOS10\Xamarin.Forms.targets" Condition="Exists('..\packages\Xamarin.Forms.1.4.4.6392\build\portable-win+net45+wp80+win81+wpa81+MonoAndroid10+MonoTouch10+Xamarin.iOS10\Xamarin.Forms.targets')" />
+  <ItemGroup>
+    <Folder Include="Core\" />
+    <Folder Include="Logger\" />
+    <Folder Include="MatchTree\" />
+    <Folder Include="Core\Messages\" />
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="Xamarin.Forms.Core">
+      <HintPath>..\packages\Xamarin.Forms.1.4.4.6392\lib\portable-win+net45+wp80+win81+wpa81+MonoAndroid10+MonoTouch10+Xamarin.iOS10\Xamarin.Forms.Core.dll</HintPath>
+    </Reference>
+    <Reference Include="Xamarin.Forms.Xaml">
+      <HintPath>..\packages\Xamarin.Forms.1.4.4.6392\lib\portable-win+net45+wp80+win81+wpa81+MonoAndroid10+MonoTouch10+Xamarin.iOS10\Xamarin.Forms.Xaml.dll</HintPath>
+    </Reference>
+    <Reference Include="Xamarin.Forms.Platform">
+      <HintPath>..\packages\Xamarin.Forms.1.4.4.6392\lib\portable-win+net45+wp80+win81+wpa81+MonoAndroid10+MonoTouch10+Xamarin.iOS10\Xamarin.Forms.Platform.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="packages.config" />
+  </ItemGroup>
+</Project>

@@ -31,17 +31,32 @@
 #include <ESP8266WiFi.h>
 #include <Wire.h>
 
+
+// MQTT Topics
+const char TOPIC_CMD[] ="/cmd";
+const char TOPIC_STATUS[] = "/status";
+const char TOPIC_EVENT[] = "/event";
+
+// Message Types
+#define MSG_TYPE_SURVEY (1)
+#define MSG_TYPE_HELLO (2)
+#define MSG_TYPE_SENSOR (3)
+#define MSG_TYPE_ACTUATOR (4)
+#define MSG_TYPE_ACTSTAT (5)
+#define MSG_TYPE_RESET (6)
+#define MSG_TYPE_OVERRIDE (7)
+#define MSG_TYPE_BUTTON (8)
+
 //////////////////////
 // WiFi Definitions //
 //////////////////////
 const char ssid[] = WIFI_SSID;
 const char password[] = WIFI_PWD;
-const char topic[] = ACTUATOR_STATUS_TOPIC;
-const char cmd_topic[] = ACTUATOR_CMD_TOPIC;
 const char server[] = SERVER;
 const char clientName[] = ACTUATOR_CLIENT_NAME;
 const char apiKey[] = API_KEY;
 const int apiKeyLength = API_KEY_LENGTH;
+String privateCmdTopic;
 
 #pragma message("ssid: " WIFI_SSID)
 #pragma message("server: " SERVER)
@@ -56,6 +71,7 @@ bool seeded = false;
 // Pin Definitions //
 /////////////////////
 const int LED_PIN = 5; // Thing's onboard, green LED
+const int RAIN_PIN = 4;
 const int BUTTON_PIN = A0; 
 const int MOTOR_OPEN_PIN = 12;
 const int MOTOR_CLOSE_PIN = 13;
@@ -75,11 +91,27 @@ const int VENT_OPEN = 4;
 const int NONE = -1;
 const int fullTransitTime = 8000; // 8 seconds
 const int stepTransitTime = fullTransitTime / VENT_OPEN;
+const int WET = 0;
+const int DRY = 1;
+const int BTN_NONE = 0;
+const int BTN_1 = 1;
+const int BTN_2 = 2;
+const int BTN_BOTH = 3;
+
+// Button thresholds
+const int BUTTON_HIGH_THRESHOLD = 840;
+const int BUTTON1_HIGH_THRESHOLD = 520;
+const int BUTTON2_HIGH_THRESHOLD = 150;
 
 int currentPosition = VENT_OPEN; // On boot, we'll assume it's open and close it.
 int targetPosition = NONE;
+int newPosition = NONE; // If it's raining, this is zero, otherwise, it's targetPosition
 int buttonState = NONE;
 int rainState = NONE;
+int rainStateCounter = 0;
+int previousRainState = NONE;
+int previousButtonState = NONE;
+int buttonStateCounter = 0;
 
 unsigned long startMillis = 0; // When the current movement started
 unsigned long endMillis = 0; // When the current movement should end
@@ -88,6 +120,31 @@ bool isMoving = false;
 bool directionOpen = false;
 bool currentOpenRelayState = HIGH;
 bool currentCloseRelayState = HIGH;
+bool ignoreRainSensor = false;
+
+String getParam(String msg, String name)
+{
+  String tmpMsg = "," + msg;
+  String lookFor = "," + name + "(";
+
+  int startIx = tmpMsg.indexOf(lookFor);
+  if(startIx < 0)
+  {
+    return "";
+  }
+  int endIx = tmpMsg.indexOf(")", startIx);
+  if(endIx < startIx)
+  {
+    return "";
+  }
+  String val =  msg.substring(startIx + lookFor.length()-1, endIx-1);
+  Serial.print("Looked for ");
+  Serial.print(lookFor);
+  Serial.print(" found ");
+  Serial.println(val);
+
+  return val;
+}
 
 String getHash(String payload)
 {
@@ -109,20 +166,18 @@ String getHash(String payload)
 
 void processPositionMessage(String msg)
 {
-  if(msg.startsWith("POS("))
-  {
-    int ix = msg.indexOf(")");
-    if(ix < 5)
-    {
-      return;
-    }
-    String data = msg.substring(4,ix);
-    Serial.print("Position requested: ");
-    Serial.println(data);
+  int pos = getParam(msg,"TPOS").toInt();
 
-    int pos = data.toInt();
-    setPosition(pos);
-  }
+  Serial.print("Position requested: ");
+  Serial.println(pos);
+  
+  setPosition(pos);
+}
+
+bool isMyTopic(String topic)
+{
+  return (topic == TOPIC_CMD) ||
+         (topic == privateCmdTopic);
 }
 
 void processMessage(String recv_topic, String msg)
@@ -131,15 +186,28 @@ void processMessage(String recv_topic, String msg)
   Serial.print(" => ");
   Serial.println(msg);
 
-  if(msg == "RESTART")
+  if(!isMyTopic(recv_topic))
   {
-    Serial.println("Restarting...");
-    delay(1000);
-    ESP.restart();
+    return;
   }
-  else
+  
+  int msgType = getParam(msg,"M").toInt();
+
+  switch(msgType)
   {
-    processPositionMessage(msg);
+    case MSG_TYPE_SURVEY:
+      publish(TOPIC_STATUS,getHelloMessage());
+      break;
+    case MSG_TYPE_RESET:
+      Serial.println("Restarting...");
+      delay(1000);
+      ESP.restart();
+      break;
+    case MSG_TYPE_ACTUATOR:
+      processPositionMessage(msg);
+      break;
+    default:
+      Serial.println("Unrecognised message");
   }
 }
 
@@ -177,6 +245,95 @@ String getValidMessage(String msg)
   return String();
 }
 
+void subscribe(String topic)
+{
+  Serial.print("Subscribing to MQTT topic: ");
+  Serial.println(topic);
+  client.subscribe(topic);
+}
+
+void publishToConnection(String topic, String msg)
+{
+  String calcHash = getHash(msg);
+  
+  msg += ":";
+  msg += calcHash;
+
+  Serial.print("[");
+  Serial.print(++counter);
+  Serial.print("] ");
+  Serial.print("Publish to ");
+  Serial.print(topic);
+  Serial.print(" = ");
+  Serial.println(msg);
+  
+  if(!client.publish(topic, msg))
+  {
+    Serial.println("Publish FAILED");
+  } 
+}
+
+void publish(String topic, String msg)
+{
+  bool connected = client.connected();
+
+  if(!connected) 
+  {
+    connected = connectBroker();
+  }
+  
+  if(connected)
+  {
+    publishToConnection(topic, msg);
+  }
+}
+
+String getBaseMessage(int messageType)
+{
+  // Add a random value to our message, so that the MD5 hash will be different,
+  // even when all of the sensor readings are the same.
+  if(!seeded)
+  {
+    randomSeed(millis());
+    seeded = true;
+  }
+  
+  long rand = random(2147483647);
+  
+  String msg = "R(" + String(rand) + "),M(" + String(messageType) + "),DEV(" + clientName + ")";
+
+  return msg;
+}
+
+String getHelloMessage()
+{
+  String msg = getBaseMessage(MSG_TYPE_HELLO);
+
+  // Add Topics
+  msg += ",PUB(" + String(TOPIC_STATUS) + ")" +
+         ",SUB(" + String(TOPIC_CMD) + ")" +
+         ",SUB(" + privateCmdTopic + ")";
+
+  return msg;
+}
+
+String getActStatMessage()
+{
+  String msg = getBaseMessage(MSG_TYPE_ACTSTAT);
+
+  String msg2 = ",POS(" + String(currentPosition) + "),TPOS(" + String(targetPosition) + "),BN(" + String(buttonState) + "),RA(" + String(rainState) + ")";
+
+  return msg + msg2;
+}
+
+String getButtonMessage()
+{
+  String msg = getBaseMessage(MSG_TYPE_BUTTON);
+
+  String msg2 = ",BN(" + String(buttonState) + ")";
+
+  return msg + msg2;
+}
 
 bool connectBroker()
 {
@@ -184,12 +341,9 @@ bool connectBroker()
   if (client.connect(clientName)) 
   {
     Serial.println("Connected to MQTT broker");
-    Serial.print("Topic is: ");
-    Serial.println(topic);
-    Serial.print("Subscribing to ");
-    Serial.println(cmd_topic);
-    client.subscribe(cmd_topic);
-    client.publish(ANNOUNCE_TOPIC,clientName);
+    subscribe(TOPIC_CMD);
+    subscribe(privateCmdTopic);
+    publishToConnection(TOPIC_STATUS,getHelloMessage());
     return true;
   }    
   else 
@@ -241,6 +395,8 @@ void initHardware()
   pinMode(LED_PIN, OUTPUT);
   pinMode(MOTOR_OPEN_PIN, OUTPUT);
   pinMode(MOTOR_CLOSE_PIN, OUTPUT);
+  pinMode(RAIN_PIN, INPUT_PULLUP);
+  pinMode(BUTTON_PIN, INPUT);
   digitalWrite(LED_PIN, LOW);
   digitalWrite(MOTOR_OPEN_PIN, HIGH);
   digitalWrite(MOTOR_CLOSE_PIN, HIGH);
@@ -260,43 +416,7 @@ int postStatus()
     connectWiFi();
   }
 
-  // TODO: Get some actual data to pass to the broker!
-  
-  // Add a random value to our message, so that the MD5 hash will be different,
-  // even when all of the sensor readings are the same.
-  if(!seeded)
-  {
-    randomSeed(millis());
-    seeded = true;
-  }
-  
-  long rand = random(2147483647);
-  
-  String msg = "R(" + String(rand) + "),POS(" + String(currentPosition) + "),TPOS(" + String(targetPosition) + "),BN(" + String(buttonState) + "),RA(" + String(rainState) + ")";
-
-  String calcHash = getHash(msg);
-  
-  msg += ":";
-  msg += calcHash;
-
-  Serial.print(++counter);
-  Serial.print(" = ");
-  Serial.println(msg);
-
-  bool connected = client.connected();
-
-  if(!connected) 
-  {
-    connected = connectBroker();
-  }
-  
-  if(connected)
-  {
-    if(!client.publish(topic, msg))
-    {
-      Serial.println("Publish FAILED");
-    } 
-  }
+  publish(TOPIC_STATUS,getActStatMessage());
 
   // Before we exit, turn the LED off.
   digitalWrite(LED_PIN, LOW);
@@ -355,7 +475,7 @@ void setRelays()
     directionOpen = false;
     startMillis = 0;
     endMillis = 0;
-    currentPosition = targetPosition;
+    currentPosition = newPosition;
   }
   else
   {
@@ -371,12 +491,21 @@ void setPosition(int position)
     return;  
   }
   
-  Serial.print("Selecting position ");
-  Serial.println(String(position));
-  
   targetPosition = position;
+  
+  if(rainState == WET && !ignoreRainSensor)
+  {
+    newPosition = 0;
+  }
+  else
+  {
+    newPosition = targetPosition;
+  }
 
-  int steps = abs(targetPosition - currentPosition);
+  Serial.print("Selecting position ");
+  Serial.println(String(newPosition));
+  
+  int steps = abs(newPosition - currentPosition);
 
   if(steps == 0)
   {
@@ -386,7 +515,7 @@ void setPosition(int position)
 
   startMillis = millis();
   endMillis = startMillis + steps * stepTransitTime;
-  directionOpen = (targetPosition > currentPosition);
+  directionOpen = (newPosition > currentPosition);
   isMoving = true;
 
   Serial.print("Timers: startMillis = ");
@@ -399,6 +528,8 @@ void setPosition(int position)
 
 void setup() 
 {
+  privateCmdTopic = String(TOPIC_CMD) + "/" + String(ACTUATOR_CLIENT_NAME);
+  
   initHardware();
 
   client.set_callback(callback);
@@ -409,8 +540,67 @@ void setup()
   digitalWrite(LED_PIN, HIGH);
 }
 
+void checkRain()
+{
+  int rain = digitalRead(RAIN_PIN) == LOW ? WET : DRY;
+
+  // Allow the pin to settle
+  if(rain != previousRainState)
+  {
+    previousRainState = rain;
+    rainStateCounter = 0;
+    return;
+  }
+
+  if(++rainStateCounter > 50)
+  {
+    if(rain != rainState)
+    {
+      Serial.println(rain == WET ? "It's RAINING" : "It's DRY");
+      rainState = rain;
+      setPosition(targetPosition); // This will either cause the vent to close if it's raining, or move to its target position if it's not
+    }
+    rainStateCounter = 0;
+  }
+}
+
+void checkButtons()
+{
+  int btn = analogRead(BUTTON_PIN);
+
+//  Serial.print("Button pin: ");
+//  Serial.println(btn);
+
+  int btn_state = (btn > BUTTON_HIGH_THRESHOLD) ? BTN_NONE :
+                  (btn > BUTTON1_HIGH_THRESHOLD) ? BTN_1 :
+                  (btn > BUTTON2_HIGH_THRESHOLD) ? BTN_2 :
+                  BTN_BOTH;   
+
+  if(btn_state != previousButtonState)
+  {
+      previousButtonState = btn_state;
+      buttonStateCounter = 0;
+      return;
+  }
+
+  if(++buttonStateCounter > 10)
+  {
+    if(btn_state != buttonState)
+    {
+      Serial.print("Button state: ");
+      Serial.println(btn_state);
+      buttonState = btn_state;
+      publish(TOPIC_EVENT,getButtonMessage());
+    }
+    buttonStateCounter = 0;
+  }
+}
+
 void loop() 
 {
+  checkRain();
+  checkButtons();
+  
   setRelays();
   client.loop();
   if (lastPost + postRate <= millis())
@@ -419,11 +609,9 @@ void loop()
     {
       lastPost = millis();
     }
-    else
-    {
-      delay(100);    
-    }
   }
+
+  delay(100);    
 }
 
 

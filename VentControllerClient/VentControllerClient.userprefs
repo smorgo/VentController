@@ -1,0 +1,81 @@
+﻿<Properties StartupItem="iOS/VentControllerClient.iOS.csproj">
+  <MonoDevelop.Ide.Workspace ActiveConfiguration="Debug" PreferredExecutionTarget="MonoDevelop.IPhone.IPhoneSimulatorTarget.IPhone4s.8.4" />
+  <MonoDevelop.Ide.Workbench ActiveDocument="MqttClient/Core/QoSManager.cs">
+    <Files>
+      <File FileName="MqttClient/Core/StreamFactory.cs" Line="86" Column="42" />
+      <File FileName="MqttClient/NetworkStream.cs" Line="8" Column="1" />
+      <File FileName="MqttClient/HashTable.cs" Line="12" Column="1" />
+      <File FileName="MqttClient/Mqtt.cs" Line="3" Column="1" />
+      <File FileName="MqttClient/Timer.cs" Line="17" Column="4" />
+      <File FileName="MqttClient/Core/QoSManager.cs" Line="13" Column="6" />
+      <File FileName="MqttClient/CompleteArgs.cs" Line="5" Column="21" />
+      <File FileName="MqttClient/IMqtt.cs" Line="4" Column="18" />
+      <File FileName="MqttClient/Core/MQTTStreamExceptions.cs" Line="5" Column="26" />
+      <File FileName="MqttClient/Core/NotConnectedException.cs" Line="5" Column="26" />
+      <File FileName="MqttClient/Core/StreamManager.cs" Line="97" Column="25" />
+      <File FileName="MqttClient/Core/Subscription.cs" Line="3" Column="26" />
+      <File FileName="MqttClient/Core/Messages/IPersistentMessage.cs" Line="2" Column="21" />
+      <File FileName="MqttClient/Core/Messages/MessageFactory.cs" Line="7" Column="35" />
+      <File FileName="MqttClient/Core/Messages/MqttAcknowledgeMessage.cs" Line="5" Column="35" />
+      <File FileName="MqttClient/Core/Messages/MqttConnackMessage.cs" Line="5" Column="35" />
+      <File FileName="MqttClient/Core/Messages/MqttConnectMessage.cs" Line="5" Column="35" />
+      <File FileName="MqttClient/Core/Messages/MqttDisconnectMessage.cs" Line="5" Column="35" />
+      <File FileName="MqttClient/Core/Messages/MqttMessage.cs" Line="5" Column="35" />
+      <File FileName="MqttClient/Core/Messages/MqttMessageReceivedEventArgs.cs" Line="5" Column="35" />
+      <File FileName="MqttClient/Core/Messages/MqttPingReqMessage.cs" Line="5" Column="35" />
+      <File FileName="MqttClient/Core/Messages/MqttPingRespMessage.cs" Line="6" Column="35" />
+      <File FileName="MqttClient/Core/Messages/MqttPubackMessage.cs" Line="6" Column="35" />
+      <File FileName="MqttClient/Core/Messages/MqttPubcompMessage.cs" Line="5" Column="35" />
+      <File FileName="MqttClient/Core/Messages/MqttPublishMessage.cs" Line="5" Column="35" />
+      <File FileName="MqttClient/Core/Messages/MqttPubrecMessage.cs" Line="5" Column="35" />
+      <File FileName="MqttClient/Core/Messages/MqttPubrelMessage.cs" Line="6" Column="35" />
+      <File FileName="MqttClient/Core/Messages/MqttSubackMessage.cs" Line="5" Column="35" />
+      <File FileName="MqttClient/Core/Messages/MqttSubscribeMessage.cs" Line="6" Column="35" />
+      <File FileName="MqttClient/Core/Messages/MqttUnsubackMessage.cs" Line="6" Column="35" />
+      <File FileName="MqttClient/Core/Messages/MqttUnsubscribeMessage.cs" Line="5" Column="35" />
+      <File FileName="MqttClient/Logger/FileLog.cs" Line="101" Column="1" />
+      <File FileName="MqttClient/Logger/ILog.cs" Line="5" Column="28" />
+      <File FileName="MqttClient/Logger/Log.cs" Line="17" Column="1" />
+      <File FileName="MqttClient/MatchTree/Topic.cs" Line="5" Column="21" />
+      <File FileName="MqttClient/MatchTree/TopicNode.cs" Line="5" Column="31" />
+      <File FileName="MqttClient/MatchTree/TopicTree.cs" Line="5" Column="31" />
+      <File FileName="MqttClient/ITcpClient.cs" Line="10" Column="6" />
+      <File FileName="MqttClient/StreamExtensions.cs" Line="45" Column="2" />
+      <File FileName="MqttClient/Console.cs" Line="36" Column="2" />
+      <File FileName="Droid/MainActivity.cs" Line="14" Column="30" />
+      <File FileName="Droid/Resources/Resource.designer.cs" Line="1" Column="1" />
+      <File FileName="Droid/Resources/AboutResources.txt" Line="1" Column="1" />
+      <File FileName="Droid/Resources/values/Strings.xml" Line="4" Column="28" />
+      <File FileName="MqttClient.Ios/MyClass.cs" Line="1" Column="1" />
+    </Files>
+    <Pads>
+      <Pad Id="ProjectPad">
+        <State name="__root__">
+          <Node name="VentControllerClient" expanded="True">
+            <Node name="MqttClient" expanded="True" />
+            <Node name="MqttClient.Droid" expanded="True" />
+            <Node name="MqttClient.Ios" expanded="True">
+              <Node name="References" expanded="True" />
+            </Node>
+            <Node name="VentControllerClient" expanded="True">
+              <Node name="References" expanded="True" />
+              <Node name="Packages" expanded="True" />
+            </Node>
+            <Node name="VentControllerClient.Droid" expanded="True">
+              <Node name="Resources" expanded="True">
+                <Node name="values" expanded="True" />
+              </Node>
+            </Node>
+            <Node name="VentControllerClient.iOS" expanded="True" selected="True">
+              <Node name="Packages" expanded="True" />
+            </Node>
+          </Node>
+        </State>
+      </Pad>
+    </Pads>
+  </MonoDevelop.Ide.Workbench>
+  <MonoDevelop.Ide.DebuggingService.Breakpoints>
+    <BreakpointStore />
+  </MonoDevelop.Ide.DebuggingService.Breakpoints>
+  <MonoDevelop.Ide.DebuggingService.PinnedWatches />
+</Properties>
